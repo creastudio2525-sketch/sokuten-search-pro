@@ -11,6 +11,12 @@ const child=(n:XmlNode,name:string)=>n.children.find(c=>c.name===name);
 function all(n:XmlNode,name:string):XmlNode[]{return [...(n.name===name?[n]:[]),...n.children.flatMap(c=>all(c,name))];}
 function finite(value:string|undefined,label:string,fallback?:number){if(value===undefined&&fallback!==undefined)return fallback;const x=Number(value);if(value===undefined||!value.trim()||!Number.isFinite(x))throw Error(`${label}が不正です`);return x;}
 function readPoint(node:XmlNode|undefined):Point{if(!node)throw Error('水平線形の座標がありません');const v=node.text.trim().split(/\s+/).map(Number);if(v.length<2||v.length>3||!v.every(Number.isFinite)||!node.text.trim())throw Error('座標値を解釈できません');return{x:v[1],y:v[0],...(v.length===3?{z:v[2]}:{})};}
+function spiralSegments(node:XmlNode):Segment[]{
+ const start=readPoint(child(node,'Start')),end=readPoint(child(node,'End')),piNode=child(node,'PI'),pi=piNode?readPoint(piNode):{x:(start.x+end.x)/2,y:(start.y+end.y)/2};
+ const count=24, out:Segment[]=[]; let prev=start; const sourceLength=Number(node.attrs.length); 
+ for(let i=1;i<=count;i++){const t=i/count,u=1-t;const p={x:u*u*start.x+2*u*t*pi.x+t*t*end.x,y:u*u*start.y+2*u*t*pi.y+t*t*end.y};const length=distance(prev,p);if(length>1e-9)out.push({kind:'line',start:prev,end:p,length,sourceLength:i===count&&Number.isFinite(sourceLength)?sourceLength:undefined});prev=p;}
+ if(!out.length)throw Error('クロソイドの長さまたは座標が不正です'); return out;
+}
 function directedAngle(s:Segment,p:Point){const c=s.center!,a=Math.atan2(s.start.y-c.y,s.start.x-c.x),b=Math.atan2(p.y-c.y,p.x-c.x);let q=b-a;if(s.rot==='cw'&&q>0)q-=TAU;if(s.rot==='ccw'&&q<0)q+=TAU;return q;}
 function sweep(s:Segment){return directedAngle(s,s.end);}
 /** Parse only horizontal CoordGeom. Vertical Profile and cross sections are never treated as route geometry. */
@@ -36,7 +42,8 @@ export function parseLandXML(text:string,fileName='入力.xml'):Route[]{
   const name=a.attrs.name||`路線${index+1}`,cg=child(a,'CoordGeom');
   if(!cg||!cg.children.length)throw Error('路線の入ったLand.XMLを入力してください');
   if(all(a,'StaEquation').length||all(a,'StaEquations').length)throw Error(`${name}: 測点方程式（StaEquation）は未対応です`);
-  const segments:Segment[]=cg.children.map(n=>{
+  const segments:Segment[]=cg.children.flatMap(n=>{
+   if(n.name==='Spiral')return spiralSegments(n);
    if(!['Line','Curve'].includes(n.name))throw Error(`${name}: 未対応の水平線形 ${n.name} が含まれています`);
    const start=readPoint(child(n,'Start')),end=readPoint(child(n,'End'));
    const s:Segment={kind:n.name==='Line'?'line':'arc',start,end,length:0};
@@ -47,7 +54,7 @@ export function parseLandXML(text:string,fileName='入力.xml'):Route[]{
     s.radius=radius;s.center=center;s.rot=rot as 'cw'|'ccw';s.length=Math.abs(sweep(s))*radius;
    }
    if(!Number.isFinite(s.length)||s.length<=1e-9)throw Error(`${name}: 0長または不正な線形があります`);
-   if(n.attrs.length!==undefined)s.sourceLength=finite(n.attrs.length,'線形長');return s;
+   if(n.attrs.length!==undefined)s.sourceLength=finite(n.attrs.length,'線形長');return [s];
   });
   for(let i=1;i<segments.length;i++)if(distance(segments[i-1].end,segments[i].start)>0.01)throw Error(`${name}: 線形が連続していません`);
   return{id:`${fileName}:${index}`,name,staStart:finite(a.attrs.staStart,'起点測点',0),length:segments.reduce((n,s)=>n+s.length,0),segments,fileName,unsupported:[],zone,datum,unit:'meter'};

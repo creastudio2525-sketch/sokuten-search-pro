@@ -1,18 +1,12 @@
 # 測点サーチPro
 
-LandXMLの路線を読み込み、メインA路線の測点から直角な横断線を引き、他路線の測点を計算するブラウザーアプリです。今回の納品はユーザー指定により**ローカル版**です。
+LandXMLの路線を読み込み、メインA路線の測点から直角な横断線を引き、他路線の測点を計算するWebアプリです。
 
-## 起動
+## 公開URL
 
-このフォルダーの **起動.cmd** をダブルクリックしてください。開発サーバーとブラウザーが起動します。コマンドで起動する場合は次の手順です。
+[測点サーチPro](https://creastudio2525-sketch.github.io/sokuten-search-pro/)
 
-```powershell
-cd C:\Users\maooh\Documents\アプリ開発\route-station-link
-npm ci
-npm run dev
-```
-
-アクセス先は http://127.0.0.1:5192/ です。起動したターミナルを閉じるとサーバーが停止します。Node.js 24で動作確認しました。地図タイルの取得にはインターネット接続が必要です。
+ブラウザーだけで利用できます。LandXML・コメントはサーバーへ送信せず、利用中のブラウザー内で処理します。
 
 ## 使い方
 
@@ -71,7 +65,7 @@ npm test
 npm run build
 ```
 
-確認内容は [VERIFICATION.md](VERIFICATION.md) を参照してください。将来静的ホスティングへ設置する場合の配信対象は `dist/` のみです。今回オンライン公開は行っていません。
+確認内容は [VERIFICATION.md](VERIFICATION.md) を参照してください。GitHub Pagesで公開しています。
 
 ロード表示は、ユーザー提供のNawsome氏（Uiverse.io）のCSSを `src/loader.css` に保持し、対応するSVGと組み合わせています。
 

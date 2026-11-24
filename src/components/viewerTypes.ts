@@ -8,7 +8,6 @@ export type ViewerCommonProps = {
   crossLines?: CrossLine[];
   projectionDefinition?: string;
   zone?: number;
-  mapboxToken?: string;
   mode?: "select" | "add";
   fitRevision?: number;
   onSelectRoute?: (id: string) => void;

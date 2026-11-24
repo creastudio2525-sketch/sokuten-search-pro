@@ -12,6 +12,7 @@ import {prepareImportedRoutes,importedFileCount} from './importFiles';
 import './app.css';
 import './logo.css';
 import './loader.css';
+import './modal.css';
 
 type Pin={id:string;routeId:string;distance:number;height:number|null;comment:string;choices:Record<string,number>};
 type Project={version:1;name:string;zone:number;datum:string;vertical:string;routes:Route[];pins:Pin[];main:string};
@@ -36,7 +37,7 @@ const safeName=(name:string)=>name.replace(/[<>:"/\\|?*]/g,'_')||'測点サー�
 function Loader({text,onCancel}:{text:string;onCancel:()=>void}){return <div className="loading-overlay" role="status"><div className="svg-frame">{[0,1,2].map(i=><svg key={i} viewBox="0 0 344 344" style={{'--i':i,'--j':i} as CSSProperties}><g stroke={i===1?'#269DD8':'#2D3082'} strokeWidth="3"><circle id={['out2','out3','inner3'][i]} cx="172" cy="172" r={125-i*24} strokeDasharray="190 45 70 28"/><path id={i===0?'inner1':undefined} d="M172 72 L259 122 L259 222 L172 272 L85 222 L85 122 Z"/><g id={i===2?'center':undefined}><circle id={i===2?'center1':undefined} cx="172" cy="172" r="12"/></g></g></svg>)}</div><b>{text}</b><button onClick={onCancel}>読み込みを中止</button></div>}
 export default function App(){
  const [project,setProject]=useState<Project>(loadInitial),[view,setView]=useState<'2d'|'3d'>('2d'),[mode,setMode]=useState<'select'|'add'>('select');
- const [selected,setSelected]=useState(''),[station,setStation]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(''),[fit,setFit]=useState(1),[saveStatus,setSaveStatus]=useState(''),[range,setRange]=useState(500),[history,setHistory]=useState<Project[]>([]),[mapboxToken,setMapboxToken]=useState('');
+ const [selected,setSelected]=useState(''),[station,setStation]=useState(''),[notice,setNotice]=useState(''),[importError,setImportError]=useState(''),[busy,setBusy]=useState(''),[fit,setFit]=useState(1),[saveStatus,setSaveStatus]=useState(''),[range,setRange]=useState(500),[history,setHistory]=useState<Project[]>([]),[mapboxToken,setMapboxToken]=useState('');
  const startTour=()=>{const guide=driver({showProgress:true,nextBtnText:'次へ',prevBtnText:'戻る',doneBtnText:'完了',steps:[{element:'#tour-settings',popover:{title:'工事設定',description:'工事名・座標系、横断線の範囲、Mapboxトークンを設定します。',side:'right',align:'start'}},{element:'#tour-import',popover:{title:'LandXMLを追加',description:'LandXMLを追加できます。ドラッグ＆ドロップにも対応し、合計10個まで取り込めます。',side:'right',align:'start'}},{element:'#tour-map',popover:{title:'地図操作',description:'左クリックで選択、右ドラッグで回転、中ドラッグで移動、ホイールで拡大縮小します。',side:'bottom',align:'center'}},{element:'#tour-results',popover:{title:'測点対応表',description:'測点をキーに、路線の対応測点、高さ、コメントを表形式で確認します。',side:'left',align:'start'}},{element:'#tour-open-save',popover:{title:'開く・保存',description:'工事データをJSON形式で開く・保存できます。',side:'bottom',align:'end'}}],onDestroyed:()=>{try{localStorage.setItem('sokuten-tour-v1','1');}catch{}}});guide.drive();};
  useEffect(()=>{try{if(!localStorage.getItem('sokuten-tour-v1'))setTimeout(startTour,350);}catch{}},[]);
  const fileInput=useRef<HTMLInputElement>(null),projectInput=useRef<HTMLInputElement>(null),worker=useRef<Worker|null>(null),cancelImport=useRef<(()=>void)|null>(null),cancelled=useRef(false),importLock=useRef(false),revision=useRef(0);
@@ -65,7 +66,7 @@ export default function App(){
 
     const added=await prepareImportedRoutes([...project.routes,...imported],rs,text);if(cancelled.current)break;imported.push(...added);messages.push(`${file.name}: ${rs.length}路線を追加`);
    }catch(e){messages.push(`${file.name}: ${e instanceof Error?e.message:String(e)}`);}
-  }if(imported.length){change(p=>({...p,zone:chosenZone,datum:chosenDatum,routes:[...p.routes,...imported],main:p.main||imported[0].id}));setFit(n=>n+1);}setNotice(messages.join('\n')||'読み込みを中止しました');
+  }if(imported.length){change(p=>({...p,zone:chosenZone,datum:chosenDatum,routes:[...p.routes,...imported],main:p.main||imported[0].id}));setFit(n=>n+1);}const failures=messages.filter(message=>!message.includes('路線を追加'));setImportError(failures.join('\n'));setNotice(messages.filter(message=>!failures.includes(message)).join('\n')||'読み込みを中止しました');
   }finally{setBusy('');importLock.current=false;if(fileInput.current)fileInput.current.value='';}
  }
  const addDistance=(d:number)=>{if(!active)return;if(!Number.isFinite(d)||d<0||d>active.length){setNotice(`測点は ${fmt(active.staStart)} ～ ${fmt(active.staStart+active.length)} の範囲で入力してください`);return;}const id=crypto.randomUUID();change(p=>({...p,pins:[...p.pins,{id,routeId:active.id,distance:d,height:null,comment:'',choices:{}}]}));setSelected(id);setNotice('');setMode('select');};
@@ -99,7 +100,7 @@ export default function App(){
   </tbody></table>
   {!activePins.length&&<div className="table-empty">地図をクリックするか、測点を数値で追加してください。</div>} </div></section>
 </div>
-<footer><span>{project.datum}・第{project.zone}系 ｜ 座標・距離 m ｜ 標高基準 {project.vertical||'未設定'}</span><span>{saveStatus}</span></footer>{busy&&<Loader text={busy} onCancel={()=>{cancelled.current=true;cancelImport.current?.();}}/>}</div>;
+<footer><span>{project.datum}・第{project.zone}系 ｜ 座標・距離 m ｜ 標高基準 {project.vertical||'未設定'}</span><span>{saveStatus}</span></footer>{busy&&<Loader text={busy} onCancel={()=>{cancelled.current=true;cancelImport.current?.();}}/>}{importError&&<div className="error-modal-backdrop" role="presentation" onClick={()=>setImportError('')}><div className="error-modal" role="alertdialog" aria-modal="true" aria-labelledby="import-error-title" onClick={e=>e.stopPropagation()}><h2 id="import-error-title">LandXMLを取り込めませんでした</h2><p>次の理由を確認してください。</p><pre>{importError}</pre><button className="primary" onClick={()=>setImportError('')}>閉じる</button></div></div>}</div>;
 }
 
 
